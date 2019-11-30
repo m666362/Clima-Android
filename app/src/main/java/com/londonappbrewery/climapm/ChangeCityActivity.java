@@ -17,7 +17,6 @@ public class ChangeCityActivity extends AppCompatActivity {
 
         setContentView( R.layout.change_city_layout );
         final EditText edittextfield = findViewById( R.id.queryET );
-//        String city = toString().getText( edittextfield )
         ImageButton backButton = findViewById( R.id.backButton );
 
         backButton.setOnClickListener( new View.OnClickListener() {

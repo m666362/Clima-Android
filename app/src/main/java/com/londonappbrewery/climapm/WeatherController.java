@@ -1,9 +1,11 @@
 package com.londonappbrewery.climapm;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -20,6 +22,11 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.karumi.dexter.Dexter;
+import com.karumi.dexter.MultiplePermissionsReport;
+import com.karumi.dexter.PermissionToken;
+import com.karumi.dexter.listener.PermissionRequest;
+import com.karumi.dexter.listener.multi.MultiplePermissionsListener;
 import com.loopj.android.http.AsyncHttpClient;
 import com.loopj.android.http.JsonHttpResponseHandler;
 import com.loopj.android.http.RequestHandle;
@@ -28,13 +35,14 @@ import com.loopj.android.http.RequestParams;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.List;
+
 import cz.msebera.android.httpclient.Header;
 
 
 public class WeatherController extends AppCompatActivity {
 
     //TODO: Adding constant
-    final int ma_request_code = 123;
     String WEATHER_URL = "http://api.openweathermap.org/data/2.5/weather";
     String APP_ID = "370079523b58d2df129ac6a05e7313b7";
     long MIN_TIME = 5000;
@@ -100,16 +108,33 @@ public class WeatherController extends AppCompatActivity {
     private void getWeatherforNewCity() {
 
         RequestParams params = new RequestParams();
-        params.put( "q", city);
+        params.put( "q", city );
         params.put( "appid", APP_ID );
         letsDoSomeNetworking( params );
     }
 
 
     //todo: add getweatherforcurrentlocation() here
-    @RequiresApi(api = Build.VERSION_CODES.M)
     private void getWeatherForCurrentLocation() {
 
+        Dexter.withActivity( this )
+                .withPermissions( Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION )
+                .withListener( new MultiplePermissionsListener() {
+                    @Override
+                    public void onPermissionsChecked(MultiplePermissionsReport report) {
+                        checkLocationInit();
+                    }
+
+                    @Override
+                    public void onPermissionRationaleShouldBeShown(List<PermissionRequest> permissions, PermissionToken token) {
+                        token.continuePermissionRequest();
+                    }
+                } )
+                .check();
+    }
+
+    @SuppressLint("MissingPermission")
+    private void checkLocationInit() {
         ma_location_manager = (LocationManager) getSystemService( Context.LOCATION_SERVICE );
         ma_location_listener = new LocationListener() {
             @Override
@@ -132,12 +157,12 @@ public class WeatherController extends AppCompatActivity {
 
             @Override
             public void onStatusChanged(String provider, int status, Bundle extras) {
-
+                Log.d( "Clima", "onStatusChanged: " );
             }
 
             @Override
             public void onProviderEnabled(String provider) {
-
+                Log.d( "Clima", "onProviderEnabled: " );
             }
 
             @Override
@@ -147,18 +172,12 @@ public class WeatherController extends AppCompatActivity {
             }
         };
 
-        if (ActivityCompat.checkSelfPermission( this, Manifest.permission.ACCESS_FINE_LOCATION ) != PackageManager.PERMISSION_GRANTED && checkSelfPermission( Manifest.permission.ACCESS_COARSE_LOCATION ) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    Activity#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for Activity#requestPermissions for more details.
-            ActivityCompat.requestPermissions( this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, ma_request_code );
-            return;
-        }
-        ma_location_manager.requestLocationUpdates( LOCATION_PROVIDER, MIN_TIME, MIN_DISTANCE, ma_location_listener );
+        Criteria criteria = new Criteria();
+        criteria.setAccuracy( Criteria.ACCURACY_MEDIUM );
+        criteria.setCostAllowed( false );
+        String providerName = ma_location_manager.getBestProvider( criteria, true );
+//and then you can make location update request with selected best provider
+        ma_location_manager.requestLocationUpdates( LocationManager.NETWORK_PROVIDER, 400, 1, ma_location_listener );
     }
 
 
@@ -183,20 +202,6 @@ public class WeatherController extends AppCompatActivity {
             }
         } );
 
-    }
-
-    @RequiresApi(api = Build.VERSION_CODES.M)
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult( requestCode, permissions, grantResults );
-        if (requestCode == ma_request_code) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.d( "Clima", "onRequestPermissionsResult() permission granted " );
-                getWeatherForCurrentLocation();
-            } else {
-                Log.d( "Clima", "Permission denied" );
-            }
-        }
     }
 
 
